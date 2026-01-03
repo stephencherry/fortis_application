@@ -89,7 +89,7 @@ public class AuthService {
         emailVerificationTokenRepository.save(emailVerificationToken);
 
         //Printing verification link for development.
-        String verificationLink = "http://localhost:8080/api/auth/verify?token=" + token;
+        String verificationLink = "http://localhost:5173/auth/verify?token=" + token;
         System.out.println("====== Printing Email Verification Link Here ===");
         System.out.println(verificationLink);
 
@@ -131,21 +131,23 @@ public class AuthService {
         FortisUser fortisUser = fortisUserRepository.findByEmail(forgotPasswordRequest.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + forgotPasswordRequest.getEmail()));
 
+        passwordResetTokenRepository.deleteByFortisUser(fortisUser);
+
         // Generate secure token
         String token = UUID.randomUUID().toString();
 
-        PasswordResetToken resetToken = PasswordResetToken.builder()
+        PasswordResetToken passwordResetToken = PasswordResetToken.builder()
                 .token(token)
                 .fortisUser(fortisUser)
-                .expiryDate(LocalDateTime.now().plusHours(1)) // 1 hour expiry
+                .expiryDate(LocalDateTime.now().plusHours(1))
                 .used(false)
                 .build();
 
-        passwordResetTokenRepository.save(resetToken);
+        passwordResetTokenRepository.save(passwordResetToken);
 
         // Simulate sending email (in real app, send actual email)
-        String resetLink = "http://localhost:8080/api/auth/reset-password?token=" + token;
-        System.out.println("=== PASSWORD RESET LINK (for testing) ===");
+        String resetLink = "http://localhost:5173/auth/reset-password?token=" + token;
+        System.out.println("===***** PASSWORD RESET LINK (for testing) *****===");
         System.out.println(resetLink);
         System.out.println("=========================================");
 
@@ -167,6 +169,17 @@ public class AuthService {
 
         resetToken.setUsed(true);
         passwordResetTokenRepository.save(resetToken);
+    }
+
+    public boolean isValidResetToken(String token) {
+        PasswordResetToken passwordResetToken = passwordResetTokenRepository.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid reset token"));
+
+        if (passwordResetToken.isUsed() || passwordResetToken.isExpired()) {
+            throw new RuntimeException("Reset Token is invalid or has expired! Try again!!");
+        }
+
+        return true;
     }
 
     public String verifyEmail(String token) {

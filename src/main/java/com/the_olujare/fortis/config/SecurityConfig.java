@@ -62,26 +62,27 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))  // ← Critical
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Allow preflight OPTIONS for all API endpoints
                         .requestMatchers(HttpMethod.OPTIONS, "/api/**").permitAll()
+                        // Public endpoints
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
-                        .requestMatchers("/h2-console").permitAll()
-                        .requestMatchers("/webjars/**", "/css/**", "/js/**").permitAll()
+                        // Everything else authenticated
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-        httpSecurity.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
+        // Allow frames for H2 console
+        http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
 
-        return httpSecurity.build();
+        return http.build();
     }
-
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {

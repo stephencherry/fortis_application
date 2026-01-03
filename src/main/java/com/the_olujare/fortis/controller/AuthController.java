@@ -2,6 +2,7 @@ package com.the_olujare.fortis.controller;
 
 import com.the_olujare.fortis.config.RateLimited;
 import com.the_olujare.fortis.dto.auth.*;
+import com.the_olujare.fortis.repository.EmailVerificationTokenRepository;
 import com.the_olujare.fortis.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -53,6 +54,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final EmailVerificationTokenRepository emailVerificationTokenRepository;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest registerRequest) {
@@ -72,16 +74,27 @@ public class AuthController {
         return ResponseEntity.ok("Password reset link has been sent to your email");
     }
 
+    @GetMapping("/reset-password/validate")
+    public ResponseEntity<?> validateResetToken(@RequestParam String token) {
+        try {
+            boolean valid = authService.isValidResetToken(token);
+            return ResponseEntity.ok(Map.of("valid", valid, "message", "Token is valid"));
+        } catch (RuntimeException runtimeException) {
+            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", runtimeException.getMessage()));
+        }
+    }
+
     @PostMapping("/reset-password")
     public ResponseEntity<String> resetPassword(@RequestBody ResetPasswordRequest resetPasswordRequest) {
         authService.resetPassword(resetPasswordRequest);
-        return ResponseEntity.ok("Password has been successfully reset");
+        return ResponseEntity.ok("Password rest successful");
     }
 
     @GetMapping("/verify")
     public ResponseEntity<String> verifyEmail(@RequestParam String token) {
         return ResponseEntity.ok(authService.verifyEmail(token));
     }
+
     @PostMapping("/refresh")
     @RateLimited
     public ResponseEntity<AuthResponse> refreshToken(@RequestBody Map<String, String> refreshRequest) {
