@@ -1,5 +1,6 @@
 package com.the_olujare.fortis.service;
 
+import com.the_olujare.fortis.config.AppProperties;
 import com.the_olujare.fortis.dto.auth.*;
 import com.the_olujare.fortis.entity.EmailVerificationToken;
 import com.the_olujare.fortis.entity.PasswordResetToken;
@@ -10,8 +11,11 @@ import com.the_olujare.fortis.repository.EmailVerificationTokenRepository;
 import com.the_olujare.fortis.repository.FortisUserRepository;
 import com.the_olujare.fortis.repository.PasswordResetTokenRepository;
 import com.the_olujare.fortis.repository.RefreshTokenRepository;
+import com.the_olujare.fortis.util.EmailUtil;
 import com.the_olujare.fortis.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -59,8 +64,11 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
-    //private final JavaMailSender javaMailSender;
+    private final JavaMailSender javaMailSender;
+    private final EmailUtil emailUtil;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AppProperties appProperties;
+
 
     public AuthResponse register(RegisterRequest registerRequest) {
         if (fortisUserRepository.existsByEmail(registerRequest.getEmail())) {
@@ -89,9 +97,12 @@ public class AuthService {
         emailVerificationTokenRepository.save(emailVerificationToken);
 
         //Printing verification link for development.
-        String verificationLink = "http://localhost:5173/auth/verify?token=" + token;
-        System.out.println("====== Printing Email Verification Link Here ===");
-        System.out.println(verificationLink);
+        String verificationUrl = appProperties.frontendUrl() + "/auth/verify?token=" + token;
+        String htmlContent = emailUtil.loadAndProcessTemplate(
+                "verification.html",
+                Map.of("verificationUrl", verificationUrl)
+        );
+        emailUtil.sendHtmlEmail(fortisUser.getEmail(), "Kindly verify Your Fortis Account", htmlContent);
 
         return AuthResponse.builder()
                 .token("PENDING_VERIFICATION")
@@ -129,7 +140,7 @@ public class AuthService {
 
     public void forgotPassword(ForgotPasswordRequest forgotPasswordRequest) {
         FortisUser fortisUser = fortisUserRepository.findByEmail(forgotPasswordRequest.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + forgotPasswordRequest.getEmail()));
+                .orElseThrow(() -> new ResourceNotFoundException("User with the email does not exist: " + forgotPasswordRequest.getEmail()));
 
         passwordResetTokenRepository.deleteByFortisUser(fortisUser);
 
@@ -145,15 +156,12 @@ public class AuthService {
 
         passwordResetTokenRepository.save(passwordResetToken);
 
-        // Simulate sending email (in real app, send actual email)
-        String resetLink = "http://localhost:5173/auth/reset-password?token=" + token;
-        System.out.println("===***** PASSWORD RESET LINK (for testing) *****===");
-        System.out.println(resetLink);
-        System.out.println("=========================================");
-
-        // In production: send via mailSender
-        // sendResetEmail(user.getEmail(), resetLink);
+        String resetUrl = appProperties.frontendUrl() + "/auth/reset-password?token=" + token;
+        String htmlContent = emailUtil.loadAndProcessTemplate(
+                "password-reset.html", Map.of("resetUrl", resetUrl));
+        emailUtil.sendHtmlEmail(fortisUser.getEmail(), "Password Reset Successfully", htmlContent);
     }
+
 
     public void resetPassword(ResetPasswordRequest resetPasswordRequest) {
         PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(resetPasswordRequest.getToken())

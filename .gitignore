@@ -54,3 +54,6 @@ Thumbs.db
 # Application properties with secrets (create application-prod.properties later)
 src/main/resources/application-prod.properties
 src/main/resources/application.properties
+.env.local
+.env.prod
+
