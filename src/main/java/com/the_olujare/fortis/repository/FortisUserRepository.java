@@ -25,5 +25,6 @@ import java.util.Optional;
 
 public interface FortisUserRepository extends JpaRepository<FortisUser, Long> {
     Optional<FortisUser> findByEmail(String email);
+
     boolean existsByEmail(String email);
 }

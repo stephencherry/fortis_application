@@ -89,10 +89,19 @@ public class AuthController {
         authService.resetPassword(resetPasswordRequest);
         return ResponseEntity.ok("Password rest successful");
     }
-
     @GetMapping("/verify")
-    public ResponseEntity<String> verifyEmail(@RequestParam String token) {
-        return ResponseEntity.ok(authService.verifyEmail(token));
+    public ResponseEntity<?> verifyEmail(@RequestParam String token) {
+        try {
+            VerificationResult result = authService.verifyEmail(token);
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException runtimeException) {
+            VerificationResult errorResult = VerificationResult.builder()
+                    .message(runtimeException.getMessage())
+                    .success(false)
+                    .alreadyVerified(false)
+                    .build();
+            return ResponseEntity.badRequest().body(errorResult);
+        }
     }
 
     @PostMapping("/refresh")

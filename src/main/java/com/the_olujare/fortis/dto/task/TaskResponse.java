@@ -1,6 +1,9 @@
 package com.the_olujare.fortis.dto.task;
 
+import com.the_olujare.fortis.entity.Task;
 import lombok.*;
+
+import java.time.LocalDate;
 
 /**
  * Represents task data returned to the client.
@@ -30,9 +33,10 @@ import lombok.*;
 
 @Getter
 @Setter
+@Builder
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class TaskResponse {
     private Long id;
     private Long userId;
@@ -40,4 +44,6 @@ public class TaskResponse {
     private String username;
     private String description;
     private boolean completed;
+    private LocalDate dueDate;
+    private Task.Priority priority;
 }

@@ -3,6 +3,8 @@ package com.the_olujare.fortis.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
+
 /**
  * Represents a task owned by a user.
  * Used to model user-specific to-do items in the system.
@@ -26,17 +28,19 @@ import lombok.*;
  * Access control is further enforced in the service layer.
  */
 
+@Entity
+@Table(name = "task")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Builder
 public class Task {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private String title;
 
     private String description;
@@ -45,6 +49,17 @@ public class Task {
     private boolean completed = false;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "user_id", nullable = false)
     private FortisUser fortisUser;
+
+    @Column
+    private LocalDate dueDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column
+    private Priority priority = Priority.MEDIUM;
+
+    public enum Priority{
+        LOW, MEDIUM, HIGH;
+    }
 }

@@ -14,9 +14,10 @@ import com.the_olujare.fortis.repository.RefreshTokenRepository;
 import com.the_olujare.fortis.util.EmailUtil;
 import com.the_olujare.fortis.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,7 @@ import java.util.UUID;
  */
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AuthService {
 
@@ -64,7 +66,6 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
-    private final JavaMailSender javaMailSender;
     private final EmailUtil emailUtil;
     private final RefreshTokenRepository refreshTokenRepository;
     private final AppProperties appProperties;
@@ -72,7 +73,7 @@ public class AuthService {
 
     public AuthResponse register(RegisterRequest registerRequest) {
         if (fortisUserRepository.existsByEmail(registerRequest.getEmail())) {
-            throw new RuntimeException("Email already in use");
+            throw new RuntimeException("Email already registered");
         }
 
         FortisUser fortisUser = FortisUser.builder()
@@ -85,8 +86,6 @@ public class AuthService {
 
         fortisUserRepository.save(fortisUser);
 
-        //Generate verification token
-
         String token = UUID.randomUUID().toString();
         EmailVerificationToken emailVerificationToken = EmailVerificationToken.builder()
                 .token(token)
@@ -95,21 +94,14 @@ public class AuthService {
                 .build();
 
         emailVerificationTokenRepository.save(emailVerificationToken);
-
-        //Printing verification link for development.
-        String verificationUrl = appProperties.frontendUrl() + "/auth/verify?token=" + token;
-        String htmlContent = emailUtil.loadAndProcessTemplate(
-                "verification.html",
-                Map.of("verificationUrl", verificationUrl)
-        );
-        emailUtil.sendHtmlEmail(fortisUser.getEmail(), "Kindly verify Your Fortis Account", htmlContent);
+        emailUtil.sendVerificationEmailAsync(fortisUser.getEmail(), token);
 
         return AuthResponse.builder()
                 .token("PENDING_VERIFICATION")
                 .refreshToken(null)
                 .username(fortisUser.getUsername())
                 .email(fortisUser.getEmail())
-                .message("Registration successful. Please verify your email (check console for link).")
+                .message("Registration successful. Please verify your email")
                 .build();
     }
 
@@ -119,20 +111,18 @@ public class AuthService {
         );
 
         FortisUser fortisUser = fortisUserRepository.findByEmail(loginRequest.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
 
-        refreshTokenRepository.findAllByFortisUser(fortisUser)
-                .forEach(refreshToken -> {
-                    refreshToken.setRevoked(true);
-                    refreshTokenRepository.save(refreshToken);
-                });
+        if (!fortisUser.isEnabled()) {
+            throw new DisabledException("User is disabled");
+        }
 
         String accessToken = jwtUtil.generateToken(fortisUser);
-        RefreshToken newRefreshToken = createRefreshToken(fortisUser);
+        RefreshToken refreshToken = createRefreshToken(fortisUser);
 
         return AuthResponse.builder()
                 .token(accessToken)
-                .refreshToken(newRefreshToken.getToken())
+                .refreshToken(refreshToken.getToken())
                 .username(fortisUser.getUsername())
                 .email(fortisUser.getEmail())
                 .build();
@@ -156,10 +146,7 @@ public class AuthService {
 
         passwordResetTokenRepository.save(passwordResetToken);
 
-        String resetUrl = appProperties.frontendUrl() + "/auth/reset-password?token=" + token;
-        String htmlContent = emailUtil.loadAndProcessTemplate(
-                "password-reset.html", Map.of("resetUrl", resetUrl));
-        emailUtil.sendHtmlEmail(fortisUser.getEmail(), "Password Reset Successfully", htmlContent);
+        emailUtil.sendPasswordResetEmailAsync(fortisUser.getEmail(), token);
     }
 
 
@@ -189,13 +176,21 @@ public class AuthService {
 
         return true;
     }
-
-    public String verifyEmail(String token) {
+    public VerificationResult verifyEmail(String token) {
         EmailVerificationToken emailVerificationToken = emailVerificationTokenRepository.findByToken(token)
                 .orElseThrow(() -> new RuntimeException("Invalid verification token"));
 
-        if (emailVerificationToken.isUsed() || emailVerificationToken.isExpired()) {
-            throw new RuntimeException("Token is invalid or expired");
+        if (emailVerificationToken.isUsed()) {
+            return VerificationResult.builder()
+                    .message("Email already verified. You can now log in.")
+                    .success(true)
+                    .alreadyVerified(true)
+                    .email(emailVerificationToken.getFortisUser().getEmail())
+                    .build();
+        }
+
+        if (emailVerificationToken.isExpired()) {
+            throw new RuntimeException("Verification link has expired. Request a new one");
         }
 
         FortisUser fortisUser = emailVerificationToken.getFortisUser();
@@ -205,7 +200,12 @@ public class AuthService {
         emailVerificationToken.setUsed(true);
         emailVerificationTokenRepository.save(emailVerificationToken);
 
-        return "Email has been successfully verified! You can now log in.";
+        return VerificationResult.builder()
+                .message("Email has been successfully verified! You can now log in.")
+                .success(true)
+                .alreadyVerified(false)
+                .email(fortisUser.getEmail())
+                .build();
     }
 
     private RefreshToken createRefreshToken(FortisUser fortisUser) {
@@ -250,4 +250,5 @@ public class AuthService {
                     refreshTokenRepository.save(token);
                 });
     }
+
 }

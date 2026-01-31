@@ -1,6 +1,11 @@
 package com.the_olujare.fortis.dto.task;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.the_olujare.fortis.entity.Task;
 import lombok.*;
+
+import java.time.LocalDate;
+
 
 /**
  * Carries task data sent from the client when creating or updating a task.
@@ -25,7 +30,12 @@ import lombok.*;
 @Setter
 @Getter
 public class TaskRequest {
+    private Long userId;
     private String title;
     private String description;
-    private Long userId;
+
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate dueDate;
+
+    private String priority;
 }

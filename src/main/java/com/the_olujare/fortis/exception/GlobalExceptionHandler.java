@@ -2,6 +2,7 @@ package com.the_olujare.fortis.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -49,11 +50,15 @@ public class GlobalExceptionHandler {
         return buildErrorResponse("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    private ResponseEntity<Map<String, Object>> buildErrorResponse(String message, HttpStatus status) {
+    public ResponseEntity<Map<String, Object>> handleDisableException(DisabledException disabledException){
+        return buildErrorResponse("User is disabled", HttpStatus.NOT_FOUND);
+    }
+
+    private ResponseEntity<Map<String, Object>> buildErrorResponse(String message, HttpStatus httpStatus) {
         Map<String, Object> body = new HashMap<>();
         body.put("error", message);
-        body.put("status", status.value());
+        body.put("status", httpStatus.value());
         body.put("timestamp", java.time.Instant.now());
-        return new ResponseEntity<>(body, status);
+        return new ResponseEntity<>(body, httpStatus);
     }
 }

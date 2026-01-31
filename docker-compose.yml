@@ -1,0 +1,23 @@
+services:
+  backend:
+    container_name: fortis-backend
+    image: olujare/fortis-backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    dns:                          # ADD THIS
+      - 8.8.8.8                   # ADD THIS
+      - 8.8.4.4                   # ADD THIS
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - APP_FRONTEND_URL=http://localhost:5173
+      - SPRING_MAIL_HOST=sandbox.smtp.mailtrap.io
+      - SPRING_MAIL_PORT=2525
+      - SPRING_MAIL_USERNAME=2acbe106bfe598
+      - SPRING_MAIL_PASSWORD=fbaa522adeaf8a
+      - JWT_SECRET=71907d1a3f3ee7c7c6db7e6766a7b06538d7afb645d08cf3a040006a0a1c99c3ef3c55909817e46deac64ae4d0b86d8c915e28bf456d55287a66d3e95073a507
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

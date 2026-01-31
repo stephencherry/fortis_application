@@ -48,18 +48,46 @@ public class TaskService {
     }
 
     public TaskResponse createTask(TaskRequest taskRequest) {
-        FortisUser fortisUser = getCurrentUser();
+        FortisUser currentUser = getCurrentUser();
+
+        // Convert string priority to enum
+        Task.Priority taskPriority = Task.Priority.MEDIUM; // default
+        if (taskRequest.getPriority() != null) {
+            try {
+                taskPriority = Task.Priority.valueOf(taskRequest.getPriority().toUpperCase());
+            } catch (IllegalArgumentException illegalArgumentException) {
+
+            }
+        }
 
         Task task = Task.builder()
                 .title(taskRequest.getTitle())
                 .description(taskRequest.getDescription())
+                .dueDate(taskRequest.getDueDate())
+                .priority(taskPriority)
+                .fortisUser(currentUser)
                 .completed(false)
-                .fortisUser(fortisUser)
                 .build();
 
         taskRepository.save(task);
         return mapToResponse(task);
     }
+
+//    public TaskResponse createTask(TaskRequest taskRequest) {
+//        FortisUser fortisUser = getCurrentUser();
+//
+//        Task task = Task.builder()
+//                .title(taskRequest.getTitle())
+//                .description(taskRequest.getDescription())
+//                .dueDate(taskRequest.getDueDate())
+//                .priority(taskRequest.getPriority() != null ? taskRequest.getPriority() : Task.Priority.MEDIUM)
+//                .completed(false)
+//                .fortisUser(fortisUser)
+//                .build();
+//
+//        taskRepository.save(task);
+//        return mapToResponse(task);
+//    }
 
     public List<TaskResponse> getTasksForCurrentUser() {
         FortisUser fortisUser = getCurrentUser();
@@ -76,8 +104,21 @@ public class TaskService {
     public TaskResponse updateTask(Long id, TaskRequest taskRequest) {
         Task task = getTaskOrThrow(id);
 
+        // Convert string priority to enum
+        Task.Priority taskPriority = task.getPriority(); // Keep existing if not provided
+        if (taskRequest.getPriority() != null) {
+            try {
+                taskPriority = Task.Priority.valueOf(taskRequest.getPriority().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // Invalid priority, keep existing
+            }
+        }
+
+
         task.setTitle(taskRequest.getTitle());
         task.setDescription(taskRequest.getDescription());
+        task.setDueDate(taskRequest.getDueDate());  // ADD THIS
+        task.setPriority(taskPriority);
 
         taskRepository.save(task);
         return mapToResponse(task);
@@ -109,6 +150,8 @@ public class TaskService {
                 .completed(task.isCompleted())
                 .userId(task.getFortisUser().getId())
                 .username(task.getFortisUser().getUsername())
+                .dueDate(task.getDueDate())
+                .priority(task.getPriority())
                 .build();
     }
 }
